@@ -1,0 +1,85 @@
+import pickle, os, random, torch
+import numpy as np
+from collections import defaultdict
+import pandas as pd
+import gymnasium as gym
+import matplotlib.pyplot as plt
+
+
+def get_space_dim(space):
+    t = type(space)
+    if t is gym.spaces.Discrete:
+        return space.n
+    elif t is gym.spaces.Box:
+        return space.shape[0]
+    else:
+        raise TypeError("Unsupported space type")
+
+
+def load_project(filename):
+    with open(filename, 'rb') as f:
+        data = pickle.load(f)
+    return data
+
+
+def save_project(obj, filename):
+    with open(filename, 'wb') as f:
+        pickle.dump(obj, f, pickle.HIGHEST_PROTOCOL)
+
+
+def make_dir(dir_path):
+    try:
+        os.makedirs(dir_path)
+    except OSError:
+        pass
+    return dir_path
+
+
+def set_seed(seed):
+    random.seed(seed)
+    np.random.seed(seed)
+    torch.manual_seed(seed)
+    if torch.cuda.is_available():
+        torch.cuda.manual_seed(seed)
+
+
+class Logger(object):
+    def __init__(self,):
+        self.metrics = defaultdict(list)
+
+    def log(self, **kwargs):
+        for k, v in kwargs.items():
+            self.metrics[k].append(v)
+
+    def save(self, path):
+        df = pd.DataFrame.from_dict(self.metrics)
+        df.to_csv(f'{path}.csv')
+
+
+def plot_reward(path, env_name):
+    df = pd.read_csv(path)
+    episodes = df['episodes']
+    reward = df['ep_reward']
+    plt.figure(figsize=(4.5, 3))
+    plt.plot(episodes, reward, linewidth=1.2)
+    plt.xlabel('Episode', fontweight=10)
+    plt.ylabel('Average Reward', fontweight=10)
+    plt.title(env_name, fontweight=12)
+    plt.plot()
+
+
+from matplotlib import animation
+
+
+def save_frames_as_gif(frames, path='./', filename='gym_animation.gif'):
+    # Mess with this to change frame size
+    plt.figure(figsize=(frames[0].shape[1] / 72.0, frames[0].shape[0] / 72.0), dpi=72)
+
+    patch = plt.imshow(frames[0])
+    plt.axis('off')
+
+    def animate(i):
+        patch.set_data(frames[i])
+
+    anim = animation.FuncAnimation(plt.gcf(), animate, frames = len(frames), interval=50)
+    anim.save(path + filename, writer='imagemagick', fps=60)
